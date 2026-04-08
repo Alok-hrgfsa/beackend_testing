@@ -1,10 +1,9 @@
+import logging
+logging.basicConfig(level=logging.DEBUG)
+
 from fastapi import FastAPI
 from fastapi.middleware.cors import CORSMiddleware
 from app.routers import auth
-
-# 👇 ADD THESE
-from app.database import Base, engine
-from app.models.user import User   # IMPORTANT
 
 app = FastAPI(title="Nesma Auth API", version="1.0.0")
 
@@ -15,9 +14,6 @@ app.add_middleware(
     allow_methods=["*"],
     allow_headers=["*"],
 )
-
-# 👇 ADD THIS (creates tables)
-Base.metadata.create_all(bind=engine)
 
 app.include_router(auth.router)
 
