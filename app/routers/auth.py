@@ -1,4 +1,4 @@
-from fastapi import APIRouter, Depends
+from fastapi import APIRouter, Depends,HTTPException, status
 from sqlalchemy.orm import Session
 from datetime import datetime, timedelta
 import secrets
@@ -19,10 +19,19 @@ router = APIRouter(prefix="/api/auth", tags=["auth"])
 @router.post("/login", response_model=StandardResponse)
 def login(req: LoginRequest, db: Session = Depends(get_db)):
     user = db.query(User).filter(User.email == req.email).first()
-    if not user or not verify_password(req.password, user.hashed_password):
-        return StandardResponse(success=False, message="Invalid credentials")
 
-    token = create_access_token({"sub": str(user.id), "email": user.email, "role": user.role })
+    if not user or not verify_password(req.password, user.hashed_password):
+        raise HTTPException(
+            status_code=status.HTTP_401_UNAUTHORIZED,
+            detail="Invalid credentials"
+        )
+
+    token = create_access_token({
+        "sub": str(user.id),
+        "email": user.email,
+        "role": user.role
+    })
+
     return StandardResponse(
         success=True,
         message="Login successful",
@@ -33,27 +42,40 @@ def login(req: LoginRequest, db: Session = Depends(get_db)):
                 "id": user.id,
                 "email": user.email,
                 "employee_number": user.employee_number,
-                    "role": user.role 
+                "role": user.role
             }
         }
     )
 
 @router.post("/register", response_model=StandardResponse)
 def register(req: RegisterRequest, db: Session = Depends(get_db)):
+
     if db.query(User).filter(User.email == req.email).first():
-        return StandardResponse(success=False, message="Email already registered")
+        raise HTTPException(
+            status_code=status.HTTP_409_CONFLICT,
+            detail="Email already registered"
+        )
+
     if db.query(User).filter(User.employee_number == req.employee_number).first():
-        return StandardResponse(success=False, message="Employee number already in use")
+        raise HTTPException(
+            status_code=status.HTTP_409_CONFLICT,
+            detail="Employee number already in use"
+        )
 
     user = User(
         email=req.email,
         employee_number=req.employee_number,
         hashed_password=hash_password(req.password),
-        role="user" 
+        role="user"
     )
+
     db.add(user)
     db.commit()
-    return StandardResponse(success=True, message="Registration successful")
+
+    return StandardResponse(
+        success=True,
+        message="Registration successful"
+    )
 
 @router.post("/forgot-password", response_model=StandardResponse)
 async def forgot_password(req: ForgotPasswordRequest, db: Session = Depends(get_db)):
